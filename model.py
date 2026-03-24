@@ -1,17 +1,17 @@
 import torchvision.transforms as transforms
-from torchvision.models import ResNet18_Weights, resnet18
+from torchvision.models import ResNet18_Weights, resnet50
 
 
 class ScreenClassifier:
     def __init__(self):
-        print("ResNet18 모델을 불러오는 중입니다...")
+        print("Getting ResNet50 model...")
         weights = ResNet18_Weights.DEFAULT
 
-        self.model = resnet18(weights=weights)
+        self.model = resnet50(weights=weights)
         self.model.eval()
         self.class_names = weights.meta["categories"]
         self.preprocess = self._build_preprocess()
-        print("load model")
+        print("ResNet50 model loaded")
 
     def _build_preprocess(self):
         return transforms.Compose(
