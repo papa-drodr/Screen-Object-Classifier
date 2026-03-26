@@ -1,17 +1,29 @@
 import torchvision.transforms as transforms
-from torchvision.models import ResNet18_Weights, resnet50
+from config import config
+from torchvision.models import ResNet18_Weights, ResNet50_Weights, resnet18, resnet50
+
+MODELS = {
+    "resnet18": (resnet18, ResNet18_Weights.DEFAULT),
+    "resnet50": (resnet50, ResNet50_Weights.DEFAULT),
+}
 
 
 class ScreenClassifier:
     def __init__(self):
-        print("Getting ResNet50 model...")
-        weights = ResNet18_Weights.DEFAULT
+        model_name = config.model.name
+        if model_name not in MODELS:
+            raise ValueError(
+                f"Unknown model '{model_name}'. Choose from: {list(MODELS.keys())}"
+            )
 
-        self.model = resnet50(weights=weights)
+        model_fn, weights = MODELS[model_name]
+        print(f"Getting {model_name} model...")
+
+        self.model = model_fn(weights=weights)
         self.model.eval()
         self.class_names = weights.meta["categories"]
         self.preprocess = self._build_preprocess()
-        print("ResNet50 model loaded")
+        print(f"{model_name} model loaded")
 
     def _build_preprocess(self):
         return transforms.Compose(

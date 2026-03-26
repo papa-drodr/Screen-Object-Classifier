@@ -4,15 +4,8 @@ import cv2
 import mss
 import numpy as np
 import torch
+from config import config
 from model import ScreenClassifier
-
-# ------------------------
-# Constants
-# ------------------------
-CAPTURE_W, CAPTURE_H = 1080, 720
-MAP_W = 240
-SMOOTHING_WINDOW = 10
-TOP_K = 3  # the top 3 predicted classes
 
 COLOR_GREEN = (0, 255, 0)
 COLOR_ORANGE = (0, 165, 255)
@@ -59,7 +52,7 @@ def get_bar_color(rank, score):
 
 def draw_predictions(img, top_probs, top_catids, class_names, origin_x, origin_y):
     """draw bar and label."""
-    for i in range(TOP_K):
+    for i in range(config.display.top_k):
         prob = top_probs[i].item()
         score = prob * 100
         label = class_names[top_catids[i]]
@@ -91,8 +84,8 @@ def draw_minimap(
     # capture area
     box_x = map_x + int(monitor_left * (map_w / full_w))
     box_y = map_y + int(monitor_top * (map_h / full_h))
-    box_w = int(CAPTURE_W * (map_w / full_w))
-    box_h = int(CAPTURE_H * (map_h / full_h))
+    box_w = int(config.capture.width * (map_w / full_w))
+    box_h = int(config.capture.height * (map_h / full_h))
     cv2.rectangle(img, (box_x, box_y), (box_x + box_w, box_y + box_h), COLOR_RED, 2)
 
     # text position
@@ -120,7 +113,7 @@ def predict_smoothed(classifier, rgb_frame, prob_history):
     prob_history.append(current_prob)
 
     smoothed_probs = torch.stack(list(prob_history)).mean(dim=0)
-    return torch.topk(smoothed_probs, TOP_K)
+    return torch.topk(smoothed_probs, config.display.top_k)
 
 
 # ------------------------
@@ -131,19 +124,20 @@ def capture(classifier):
 
     primary_monitor = sct.monitors[1]
     full_w, full_h = primary_monitor["width"], primary_monitor["height"]
-    monitor_top, monitor_left = 150, 150
+    monitor_top, monitor_left = config.capture.start_top, config.capture.start_left
 
-    map_h = int(MAP_W * (full_h / full_w))
-    map_x = CAPTURE_W - MAP_W - 10
+    map_w = config.display.minimap_width
+    map_h = int(map_w * (full_h / full_w))
+    map_x = config.capture.width - map_w - 10
     map_y = 10
     pred_origin_y = map_y + map_h + 40  # Start prediction result y
 
     full_monitor = {"top": 0, "left": 0, "width": full_w, "height": full_h}
     full_sct_img = sct.grab(full_monitor)
     full_bgr = cv2.cvtColor(np.array(full_sct_img), cv2.COLOR_BGRA2BGR)
-    minimap_bg = cv2.resize(full_bgr, (MAP_W, map_h))
+    minimap_bg = cv2.resize(full_bgr, (map_w, map_h))
 
-    prob_history = deque(maxlen=SMOOTHING_WINDOW)
+    prob_history = deque(maxlen=config.display.smoothing_window)
 
     print("Start capturing(Termination: 'q' / Mini-map Update: 'n' / Move: WASD)")
 
@@ -151,8 +145,8 @@ def capture(classifier):
         monitor = {
             "top": monitor_top,
             "left": monitor_left,
-            "width": CAPTURE_W,
-            "height": CAPTURE_H,
+            "width": config.capture.width,
+            "height": config.capture.height,
         }
         sct_img = sct.grab(monitor)
         frame = np.array(sct_img)
@@ -176,7 +170,7 @@ def capture(classifier):
             minimap_bg,
             map_x,
             map_y,
-            MAP_W,
+            map_w,
             map_h,
             monitor_top,
             monitor_left,
@@ -191,17 +185,17 @@ def capture(classifier):
         if key in (ord("q"), 27):
             break
         elif key == ord("w") and monitor_top > 0:
-            monitor_top -= 2
+            monitor_top -= config.capture.move_speed
         elif key == ord("s") and monitor_top < full_h:
-            monitor_top += 2
+            monitor_top += config.capture.move_speed
         elif key == ord("a") and monitor_left > 0:
-            monitor_left -= 2
+            monitor_left -= config.capture.move_speed
         elif key == ord("d") and monitor_left < full_w:
-            monitor_left += 2
+            monitor_left += config.capture.move_speed
         elif key == ord("n"):  # 미니맵 배경 갱신
             full_sct_img = sct.grab(full_monitor)
             full_bgr = cv2.cvtColor(np.array(full_sct_img), cv2.COLOR_BGRA2BGR)
-            minimap_bg = cv2.resize(full_bgr, (MAP_W, map_h))
+            minimap_bg = cv2.resize(full_bgr, (map_w, map_h))
 
     cv2.destroyAllWindows()
 
